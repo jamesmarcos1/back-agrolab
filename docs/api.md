@@ -66,10 +66,12 @@ Sucesso 201 retorna sessão; o usuário pode acessar a home. Código é string p
 | 429 | Aguardar o cabeçalho Retry-After |
 | 503 | Banco/serviço indisponível; apresentar mensagem e opção de tentar novamente |
 
-Para uma chamada protegida que receba 401, um coordenador de sessão (por exemplo, um actor) deve reunir as chamadas concorrentes em uma única renovação. Se refresh falhar, apagar os tokens e voltar ao login. Não reenviar automaticamente register/verify/reset sem avaliar o resultado: podem já ter sido processados antes de uma perda de conexão.
+Para uma chamada protegida que receba 401, um coordenador de sessão deve reunir as chamadas concorrentes em uma única renovação. Um actor precisa manter uma operação compartilhada em andamento, pois awaits permitem reentrância. Se refresh for recusado como sessão inválida, apagar os tokens e voltar ao login. Falha de rede é diferente: uma resposta perdida após envio pode significar que o servidor já rotacionou o token; não repetir automaticamente o refresh anterior. Solicitar novo login quando a conexão permitir. Não reenviar automaticamente register/verify/reset sem avaliar o resultado: podem já ter sido processados antes de uma perda de conexão.
 
 A validade do código começa no servidor no momento da emissão; o prazo recebido ajuda o contador da UI, mas não aumenta a validade em função da latência. Falta de conexão deve ser tratada como erro de URLSession, não como credencial inválida. E-mails podem atrasar: aguarde o contador e permita reenvio.
 
 No simulador do mesmo computador, usar localhost. Em iPhone físico, a URL local precisa ser alcançável pela rede e o ATS precisa ser considerado para desenvolvimento; homologação HTTPS é o caminho preferido. Não desabilitar ATS globalmente para produção.
 
 OpenAPI está em `openapi.json`. Foi exportado do código com `python -m scripts.export_openapi`; não contém segredos ou dados do banco.
+
+Implementação no app e roteiro de aceite: `docs/swift-integration.md`. Evidências de revalidação: `docs/validation-2026-10-06.md`.

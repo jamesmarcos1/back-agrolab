@@ -131,6 +131,8 @@ As rotinas de backup têm verificação Windows separada: `./tests/test_backup_c
 
 O contrato completo está em `docs/openapi.json` e o guia em `docs/api.md`.
 
+Para o responsável pelo iOS, `docs/swift-integration.md` detalha a implementação das telas, URLSession/Codable, Keychain, refresh compartilhado, erros e o roteiro de aceite no iPhone. `docs/validation-2026-10-06.md` registra a nova execução: 48 testes passaram com 92,46% de cobertura e 33 verificações externas passaram, incluindo recuperação de senha. O código Swift não está no workspace e ainda exige compilação/testes no ambiente Apple.
+
 | Método | Rota | Finalidade |
 | --- | --- | --- |
 | POST | `/api/v1/auth/register` | Criar cadastro pendente |

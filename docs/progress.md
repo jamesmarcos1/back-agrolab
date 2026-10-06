@@ -47,4 +47,6 @@ Plano: superpowers/plans/2026-10-06-login-agrolab.md. Início: 06/10/2026.
 
 ## Pendências da operação
 
+Revalidação solicitada para o Swift em 06/10/2026: 48 testes passaram novamente no PostgreSQL18.6 local isolado, cobertura 92,46%; banco de teste removido ao terminar. Mais 33 verificações públicas passaram (10 de infraestrutura/erros, 23 do fluxo com SMTP Resend), incluindo replay de refresh, recuperação/redefinição de senha e encerramento da própria conta temporária. Guia `docs/swift-integration.md` e relatório `docs/validation-2026-10-06.md` entregues. Não há projeto Swift/Xcode no workspace, portanto validação do app permanece pendente.
+
 Definir bucket externo e custódia recuperável da chave, alertas/monitoramento, registro operacional de exclusões para recuperação e testes de carga. Projeto Swift e atualização posterior dos DOCX não estão nesta entrega. A branch local não foi enviada; CI do GitHub está preparada, mas a publicação inicial usou validações manuais, sem alegar execução remota do workflow.
