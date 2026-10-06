@@ -1,0 +1,37 @@
+name: Backend CI
+on:
+  pull_request:
+  push:
+    branches: [main, feat/login]
+permissions:
+  contents: read
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:18
+        env:
+          POSTGRES_USER: agrolab
+          POSTGRES_PASSWORD: ci-only-password
+          POSTGRES_DB: agrolab_test
+        ports: ["5432:5432"]
+        options: >-
+          --health-cmd "pg_isready -U agrolab -d agrolab_test"
+          --health-interval 5s --health-timeout 5s --health-retries 10
+    env:
+      TEST_DATABASE_URL: postgresql+psycopg://agrolab:ci-only-password@localhost:5432/agrolab_test
+      DATABASE_URL: postgresql+psycopg://agrolab:ci-only-password@localhost:5432/agrolab_test
+      JWT_SECRET: ci-jwt-unused-aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa
+      OTP_SECRET: ci-otp-unused-bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb
+      ENVIRONMENT: test
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.13"
+      - run: pip install -r requirements.lock
+      - run: ruff check . && ruff format --check .
+      - run: pytest --cov=app --cov-report=term-missing --cov-fail-under=70
+      - run: alembic upgrade head && alembic check
+      - run: docker build -t agrolab-api:ci .
