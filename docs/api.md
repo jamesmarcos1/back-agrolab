@@ -1,6 +1,6 @@
 # Contrato da autenticação AgroLab
 
-JSON, snake_case, UUIDs, mensagens em pt-BR. Prefixo `/api/v1`. API local `http://localhost:8000`; endereço de produção previsto `https://api-agrolab.jamesmarcos.com`.
+JSON, snake_case, UUIDs, mensagens em pt-BR. Prefixo `/api/v1`. API local `http://localhost:8000`; produção publicada em `https://api-agrolab.jamesmarcos.com`. Base de consumo no Swift: `https://api-agrolab.jamesmarcos.com/api/v1`.
 
 ## Cadastro e confirmação
 

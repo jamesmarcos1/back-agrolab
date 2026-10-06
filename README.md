@@ -2,6 +2,8 @@
 
 Este backend implementa a autenticação do aplicativo AgroLab em Swift. Ele cadastra o produtor, confirma seu e-mail, faz login e controla as sessões. Foi criado a partir do UC01 dos três documentos com MVP da pasta `Trabalho-Agrolab`.
 
+Publicado em **https://api-agrolab.jamesmarcos.com**, na Oracle pelo Coolify. Saúde: https://api-agrolab.jamesmarcos.com/health/ready. As rotas estão em `/api/v1`; a raiz não é uma página web. Cadastro, confirmação por e-mail, login, perfil, refresh, logout e encerramento foram verificados pela URL pública.
+
 ## O que foi implementado e por quê
 
 | Entrega | Comportamento | Motivo |
@@ -24,7 +26,9 @@ Este backend implementa a autenticação do aplicativo AgroLab em Swift. Ele cad
 | Logs mínimos | Eventos, horário e IDs; sem senha, OTP ou tokens | Permite investigar falhas sem gravar credenciais |
 | Erros padronizados | Código estável, mensagem pt-BR e request ID | Facilita o tratamento no Swift e evita expor entradas sensíveis |
 | Docker | API, banco, caixa de e-mail de teste e limpeza | Reproduz o ambiente e facilita o deploy no Coolify |
-| CI | Lint, formato, testes, cobertura, migrações e build | Impede publicar uma alteração sem passar pelas verificações |
+| Resend SMTP | Remetente verificado `agrolab@jamesmarcos.com`, TLS e chave limitada ao envio no domínio | Envia códigos sem contratar uma caixa postal; adequado ao limite gratuito escolhido para o MVP |
+| Backups | Agendamento diário no Coolify e cópia externa AES-256-GCM com restauração verificada | Volume persistente resiste a redeploy; backup permite recuperar perda ou corrupção |
+| CI preparada | Workflow de lint, formato, testes, cobertura, migrações e build | Executa as verificações quando o repositório estiver conectado ao GitHub; a publicação inicial foi validada manualmente |
 
 O documento chama a confirmação inicial de “2FA”. Aqui ela combina senha e código de e-mail no cadastro. Isso não representa MFA obrigatório em todos os logins. `email_verified_at` registra a confirmação; não usamos `dois_fatores_ativo` para afirmar uma proteção permanente inexistente.
 
@@ -33,6 +37,8 @@ O documento chama a confirmação inicial de “2FA”. Aqui ela combina senha e
 O backend é um monólito modular: uma aplicação com responsabilidades separadas. O login não precisa de microsserviços, Kubernetes ou fila distribuída. A API concentra validação e acesso ao banco; o iPhone não recebe credenciais de PostgreSQL.
 
 Foi escolhida Oracle + Coolify porque o responsável já usa essa infraestrutura. O usuário confirmou que os documentos podem ser atualizados para substituir AWS. PostgreSQL permanece, e o app continuará independente do provedor porque consome HTTPS.
+
+O projeto usa Resend gratuito para envio transacional, escolhido pelo usuário. `agrolab@jamesmarcos.com` é o remetente da aplicação; não foi criada uma caixa para receber mensagens nesse endereço. Hostinger administra o registro do domínio, mas seus servidores DNS autoritativos são da Cloudflare. Por isso os registros da API e do Resend foram configurados na Cloudflare.
 
 Firebase Authentication é uma alternativa possível, mas esta entrega usa autenticação própria para cumprir exatamente o contrato documentado de bcrypt, OTP e sessões. Não existem duas autoridades de login.
 
@@ -68,6 +74,8 @@ docker compose ps
 
 O script gera `.env` com segredos aleatórios locais e preserva qualquer arquivo existente. A aplicação de migrações termina antes de iniciar API e limpeza. Não envie `.env` ao Git.
 
+O Compose foi construído e iniciado nesta máquina após a recuperação do Docker: API, PostgreSQL 18 e Mailpit saudáveis; migração terminou com código 0. O ambiente local está ativo nas URLs abaixo, separado dos dados e do remetente de produção.
+
 - API: http://localhost:8000
 - Swagger local: http://localhost:8000/docs
 - E-mails de teste no Mailpit: http://localhost:8025
@@ -95,7 +103,7 @@ docker compose up -d db mailpit
 
 `requirements.lock` fixa as dependências de desenvolvimento; `requirements-prod.lock` contém somente execução. Os locks foram resolvidos com corte de publicação em 06/09/2026, respeitando a regra de dependências estáveis publicadas há pelo menos 30 dias. O Dockerfile usa o lock de produção e executa com usuário sem privilégios.
 
-Nesta máquina, o Docker Desktop apresentou falhas de sockets Windows e o Ubuntu antigo estava cadastrado com VHDX ausente. A validação inicial usou os binários PostgreSQL 17.4 já instalados, com um cluster novo em `.runtime/pgdata` na porta 54329. Nenhum banco existente foi reutilizado. O alvo do Compose e CI é PostgreSQL 18. Consulte `docs/environment.md` para o registro desses ajustes; não execute dois servidores na mesma porta.
+Nesta máquina, o Docker Desktop apresentou falhas de sockets Windows e o Ubuntu antigo estava cadastrado com VHDX ausente. Foi criado `Ubuntu-AgroLab`, preservando o cadastro antigo; os diretórios de sockets foram preservados pelo novo WSL e o Docker Engine voltou a responder. A validação inicial usou os binários PostgreSQL 17.4 já instalados, com um cluster novo em `.runtime/pgdata` na porta 54329. Nenhum banco existente foi reutilizado. O alvo do Compose e CI é PostgreSQL 18. Consulte `docs/environment.md` para o registro desses ajustes; não execute dois servidores na mesma porta.
 
 ## Testes e qualidade
 
@@ -113,7 +121,11 @@ $env:TEST_DATABASE_URL = & .\.venv\Scripts\python.exe -c "from app.core.config i
 
 Cobertura mínima exigida: 70%. Os testes verificam limites exatos de expiração, confirmação única, reenvio, contas duplicadas, falha de e-mail, isolamento, JWT adulterado, logout, replay de refresh, redefinição de senha, exclusão e concorrência com o job de limpeza.
 
+Resultado final de autenticação: **48 testes passaram, cobertura de 92,46%**, usando PostgreSQL 18 e Linux ARM na VPS em ambiente descartável. `alembic upgrade head`, `alembic check`, lint, formato e build da imagem ARM passaram. Os testes não foram apontados para produção.
+
 Uma revisão independente identificou ordem de locks divergente, distinção de contas em falha SMTP e disputas com a limpeza. Foram adicionados testes que reproduziram os erros e passaram após a correção. Limites e revogações de respostas esperadas são confirmados no banco mesmo quando a API retorna erro; desfazer essas transações permitiria ignorar as tentativas ou manter sessões comprometidas.
+
+As rotinas de backup têm verificação Windows separada: `./tests/test_backup_crypto.ps1` no PowerShell 7.4+. Ela verifica oito criações concorrentes da mesma chave, recuperação do conteúdo e rejeição de adulteração. A criação atômica evita perder uma chave quando dois backups são iniciados juntos. A restauração de validação remove no `finally` apenas o banco criado pela própria execução; `-KeepRestoreDatabase` preserva explicitamente essa cópia para inspeção.
 
 ## API e consumo pelo Swift
 
@@ -148,14 +160,26 @@ No Swift: usar URLSession e Codable; refresh no Keychain, access preferencialmen
 
 ## Produção e hospedagem
 
-Endereço previsto: `https://api-agrolab.jamesmarcos.com`. Coolify existente: `https://coolify.jamesmarcos.com`. A VPS foi inspecionada por SSH: ARM/aarch64, aproximadamente 12 GB RAM; há outros projetos ativos. O deploy deve usar recursos e bancos próprios do AgroLab.
+Endereço publicado: `https://api-agrolab.jamesmarcos.com`. Coolify: `https://coolify.jamesmarcos.com`, projeto **AgroLab**, serviço **agrolab-auth-production**. A VPS é ARM/aarch64 e tem aproximadamente 12 GB RAM. API, PostgreSQL 18, migração e limpeza usam recursos e credenciais próprios do AgroLab.
+
+`compose.production.yaml` é a definição utilizada no recurso Docker Compose Empty do Coolify. A imagem `agrolab-api:20261006` foi construída e testada na VPS; `pull_policy: never` utiliza essa imagem local. A primeira entrega não depende de registry ou repositório Git público. Uma nova publicação exige construir uma tag nova e atualizar a definição no Coolify; apenas alterar o código no computador não modifica a API hospedada.
 
 `docs/deploy.md` registra variáveis, rede privada, proxy confiável, migrações, backup e rollback. A API de produção exige HTTPS, SMTP autenticado com TLS, segredos distintos e emissor/destinatário JWT próprios. Swagger fica desabilitado em produção.
 
-O DNS sozinho não publica a API: é necessário configurar o aplicativo no Coolify, certificado, e-mail, job de limpeza e backups. O backup externo deve ser criptografado e testado por restauração; retenção proposta de 14 dias. Criptografia do volume Oracle não acompanha automaticamente um dump exportado.
+API e banco estão saudáveis, o certificado HTTPS foi validado e o banco não publica porta no host. O remetente foi verificado com DKIM e os registros de envio exigidos pelo Resend, além de DMARC. O smoke test usou o destinatário de teste oficial do Resend e confirmou o código em sua janela de validade. Isso valida a integração SMTP; o recebimento na caixa pessoal do usuário e a integração no iPhone ainda precisam ser conferidos pelo responsável pelo app.
+
+Backup diário do banco `agrolab` no Coolify: `0 3 * * *`, timezone UTC; até 14 cópias, 14 dias ou 1 GB, conforme o limite atingido primeiro. A primeira execução terminou com sucesso. Essa cópia fica na VPS. Foi criada também uma cópia **fora da VPS**, no computador, criptografada com AES-256-GCM e restaurada em PostgreSQL 18 descartável. O envio externo automático para um bucket ainda depende da definição do destino.
+
+Para criar outra cópia externa no PowerShell 7.4+:
+
+```powershell
+.\scripts\backup_database.ps1 -SshKeyPath 'D:\Users\PICHAU\Desktop\vps\ssh-key-2026-06-03.key'
+```
+
+O dump trafega por SSH e fica apenas em memória antes da criptografia. Os arquivos `.agbackup` e `key.dpapi` ficam em `.runtime/backups`, fora do Git. A chave DPAPI está vinculada ao usuário e ao Windows desta máquina: copiar somente esses arquivos para outro computador não garante recuperação. Antes de depender dessa cópia para desastre da máquina, definir custódia recuperável da chave e um destino externo automático. `scripts/verify_backup.ps1` verifica integridade e restaura apenas em um container de validação/restauração, nunca no container produtivo.
 
 ## Limitações e próximas entregas
 
-O backend não implementa diagnóstico, culturas, histórico, sincronização ou AgroBot. A ausência do projeto Swift impede validar a tela no iPhone nesta pasta. Publicação depende da configuração de DNS/Coolify e do remetente real de e-mail. A disponibilidade de 99% e capacidade de 500 usuários precisam de monitoramento e teste de carga; não são garantidas por um container funcionando.
+O backend não implementa diagnóstico, culturas, histórico, sincronização ou AgroBot. A ausência do projeto Swift impede validar a tela no iPhone nesta pasta. Faltam o destino externo automático de backups, a custódia recuperável da chave da cópia local e o registro operacional de exclusões para uma recuperação antiga. A disponibilidade de 99% e capacidade de 500 usuários precisam de monitoramento e teste de carga; não são garantidas por um container funcionando.
 
-Os três DOCX ainda precisam refletir Oracle/Coolify e a configuração efetiva de redundância, criptografia e recuperação. `docs/progress.md` mantém o estado da implementação e o que foi verificado, sem confundir código entregue com infraestrutura ainda pendente.
+Os três DOCX ainda precisam refletir Oracle/Coolify/Resend e a configuração efetiva de redundância, criptografia e recuperação. `docs/progress.md` registra as evidências e pendências. O Git é local, na branch `feat/login`; nenhum repositório remoto foi criado ou enviado.

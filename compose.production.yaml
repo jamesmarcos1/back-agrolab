@@ -1,0 +1,69 @@
+# Imagem ARM construída e verificada na VPS; sem pull de registry externo.
+x-api-environment: &api-environment
+  ENVIRONMENT: production
+  DATABASE_URL: postgresql+psycopg://agrolab:${POSTGRES_PASSWORD}@db:5432/agrolab
+  JWT_SECRET: ${JWT_SECRET}
+  OTP_SECRET: ${OTP_SECRET}
+  JWT_ISSUER: agrolab-production
+  JWT_AUDIENCE: agrolab-ios-production
+  SMTP_HOST: smtp.resend.com
+  SMTP_PORT: 465
+  SMTP_SECURITY: ssl
+  SMTP_USERNAME: resend
+  SMTP_PASSWORD: ${SMTP_PASSWORD}
+  MAIL_FROM: AgroLab <agrolab@jamesmarcos.com>
+  PRIVACY_POLICY_VERSION: "2026-10-06"
+  FORWARDED_ALLOW_IPS: ${TRUSTED_PROXY_IPS}
+services:
+  db:
+    image: postgres:18
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: agrolab
+      POSTGRES_DB: agrolab
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+    volumes:
+      - agrolab_postgres_data:/var/lib/postgresql
+    mem_limit: 512m
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U agrolab -d agrolab"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+  migrate:
+    image: agrolab-api:20261006
+    pull_policy: never
+    restart: "no"
+    environment: *api-environment
+    command: ["alembic", "upgrade", "head"]
+    mem_limit: 256m
+    healthcheck:
+      disable: true
+    depends_on:
+      db:
+        condition: service_healthy
+  api:
+    image: agrolab-api:20261006
+    pull_policy: never
+    restart: unless-stopped
+    environment: *api-environment
+    expose: ["8000"]
+    mem_limit: 512m
+    cpus: 2
+    depends_on:
+      migrate:
+        condition: service_completed_successfully
+  cleanup:
+    image: agrolab-api:20261006
+    pull_policy: never
+    restart: unless-stopped
+    environment: *api-environment
+    command: ["python", "-m", "app.jobs.cleanup", "--loop"]
+    mem_limit: 256m
+    healthcheck:
+      disable: true
+    depends_on:
+      migrate:
+        condition: service_completed_successfully
+volumes:
+  agrolab_postgres_data:

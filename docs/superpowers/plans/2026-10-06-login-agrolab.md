@@ -1,11 +1,11 @@
 # Plano de implementação do login AgroLab
 
-Data: 06/10/2026. Estado: proposta pronta para revisão; nenhum backend implementado ou publicado.
+Data: 06/10/2026. Este é o plano inicial aprovado pelo usuário. A implementação e a API HTTPS foram entregues; evidências e pendências estão em `docs/progress.md`. As caixas abaixo preservam o roteiro original, não representam o estado atual de cada verificação.
 
 **Objetivo:** entregar o UC01 com cadastro, confirmação de e-mail, login e gestão de sessão, acessível por HTTPS ao aplicativo Swift.
 **Arquitetura:** monólito modular FastAPI, PostgreSQL privado e envio de e-mail transacional. Containers na VPS Oracle administrados pelo Coolify.
 **Stack proposta:** Python 3.13, FastAPI, Pydantic, SQLAlchemy 2, psycopg, Alembic, bcrypt, PyJWT, pytest, HTTPX e Docker.
-**Execução futura:** implementar sequencialmente, verificando cada etapa. Este arquivo é a proposta de arquitetura e seu plano de execução; não autoriza provisionamentos nesta etapa.
+**Execução:** implementação sequencial autorizada pelo usuário após a elaboração deste plano, incluindo acesso à VPS/Coolify/DNS e publicação. Resend gratuito escolhido para o MVP; backup externo automático depende do destino.
 
 ## 1. Evidências e decisões
 
