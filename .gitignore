@@ -13,3 +13,7 @@ htmlcov/
 *.egg-info/
 .superpowers/
 *.log
+entregas/*.zip
+.playwright-cli/
+output/
+entregas/consulta-banco-*.md

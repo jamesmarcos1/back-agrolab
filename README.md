@@ -133,6 +133,8 @@ O contrato completo está em `docs/openapi.json` e o guia em `docs/api.md`.
 
 Para o responsável pelo iOS, `docs/swift-integration.md` detalha a implementação das telas, URLSession/Codable, Keychain, refresh compartilhado, erros e o roteiro de aceite no iPhone. `docs/validation-2026-10-06.md` registra a nova execução: 48 testes passaram com 92,46% de cobertura e 33 verificações externas passaram, incluindo recuperação de senha. O código Swift não está no workspace e ainda exige compilação/testes no ambiente Apple.
 
+`docs/entrega-swift.md` contém a mensagem pronta para os colegas e os critérios para concluir a integração. O pacote `entregas/agrolab-swift-2026-10-06.zip` reúne essa orientação, o guia, o contrato resumido, o OpenAPI e o relatório de validação. Ele foi montado com uma lista explícita de arquivos, sem incluir configuração privada ou dados do banco; o ZIP gerado não entra no Git.
+
 | Método | Rota | Finalidade |
 | --- | --- | --- |
 | POST | `/api/v1/auth/register` | Criar cadastro pendente |
@@ -168,6 +170,8 @@ Endereço publicado: `https://api-agrolab.jamesmarcos.com`. Coolify: `https://co
 
 `docs/deploy.md` registra variáveis, rede privada, proxy confiável, migrações, backup e rollback. A API de produção exige HTTPS, SMTP autenticado com TLS, segredos distintos e emissor/destinatário JWT próprios. Swagger fica desabilitado em produção.
 
+Para acompanhar cadastros e sessões, `docs/database-monitoring.md` explica o acesso pelo terminal do Coolify, os eventos esperados e o teste com uma conta controlada pelo responsável. `docs/database-checks.sql` reúne consultas em transação somente leitura, com tempo limite e sem consultar senhas/tokens; isso permite verificar o banco sem alterar registros. O acompanhamento descrito é manual, e os alertas externos continuam pendentes.
+
 API e banco estão saudáveis, o certificado HTTPS foi validado e o banco não publica porta no host. O remetente foi verificado com DKIM e os registros de envio exigidos pelo Resend, além de DMARC. O smoke test usou o destinatário de teste oficial do Resend e confirmou o código em sua janela de validade. Isso valida a integração SMTP; o recebimento na caixa pessoal do usuário e a integração no iPhone ainda precisam ser conferidos pelo responsável pelo app.
 
 Backup diário do banco `agrolab` no Coolify: `0 3 * * *`, timezone UTC; até 14 cópias, 14 dias ou 1 GB, conforme o limite atingido primeiro. A primeira execução terminou com sucesso. Essa cópia fica na VPS. Foi criada também uma cópia **fora da VPS**, no computador, criptografada com AES-256-GCM e restaurada em PostgreSQL 18 descartável. O envio externo automático para um bucket ainda depende da definição do destino.
@@ -179,6 +183,17 @@ Para criar outra cópia externa no PowerShell 7.4+:
 ```
 
 O dump trafega por SSH e fica apenas em memória antes da criptografia. Os arquivos `.agbackup` e `key.dpapi` ficam em `.runtime/backups`, fora do Git. A chave DPAPI está vinculada ao usuário e ao Windows desta máquina: copiar somente esses arquivos para outro computador não garante recuperação. Antes de depender dessa cópia para desastre da máquina, definir custódia recuperável da chave e um destino externo automático. `scripts/verify_backup.ps1` verifica integridade e restaura apenas em um container de validação/restauração, nunca no container produtivo.
+
+## Melhorias de segurança e operação recomendadas
+
+Revisão focada da configuração e dos controles em 06/10/2026, sem mudanças de permissões ou de comportamento nesta entrega. Isso não constitui uma auditoria completa de vulnerabilidades.
+
+- **Separar credenciais do banco:** `compose.production.yaml` configura API, migração e limpeza com o usuário `agrolab`. Uma consulta de leitura em `pg_roles` no banco publicado confirmou `rolsuper`, `rolcreatedb` e `rolcreaterole` como verdadeiros. Criar um usuário de execução com somente as permissões de dados necessárias e manter migrações/administração em credenciais separadas reduz o impacto de um comprometimento da aplicação. Validar os fluxos e a limpeza com o usuário restrito, além da recusa de operações administrativas, antes de trocar a produção. [Atributos de roles no PostgreSQL](https://www.postgresql.org/docs/current/role-attributes.html).
+- **Automatizar backup externo e recuperação da chave:** o backup diário atual permanece na VPS; a cópia externa no computador é manual e sua chave depende deste usuário/Windows. Definir destino externo, retenção, alertas e custódia recuperável da chave, repetindo restauração em banco descartável. Isso permite recuperar os dados mesmo com perda da VPS ou deste computador.
+- **Proteger e acompanhar o envio de e-mails:** `AuthService.send_limits` já limita por IP e endereço, mas não há orçamento global de envio no backend. Um limite global com alertas e reserva para recuperação de senha ajuda a controlar abuso distribuído e o consumo do serviço; a cota também deve considerar outros aplicativos da mesma conta Resend. O plano gratuito tem 100 e-mails/dia, com reinício à meia-noite UTC, e 3.000/mês. Definir o orçamento conforme o uso real, preservando respostas genéricas e sem registrar OTPs/tokens. [Cotas oficiais do Resend](https://resend.com/docs/knowledge-base/account-quotas-and-limits).
+- **Alertar sobre falhas:** configurar monitoramento externo da API, dos backups, da limpeza e das falhas SMTP. Os eventos existentes ajudam a investigar problemas; gravar eventos não envia alertas nem comprova disponibilidade contínua.
+
+HTTPS, bcrypt, expiração de tokens/códigos, rotação/revogação de sessões e limites existentes continuam sendo os controles implementados. As recomendações acima estão pendentes e não impedem o desenvolvimento da integração Swift; eu priorizaria o usuário restrito do banco antes de ampliar o uso real.
 
 ## Limitações e próximas entregas
 
